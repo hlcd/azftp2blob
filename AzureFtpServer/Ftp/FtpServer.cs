@@ -40,6 +40,11 @@ namespace AzureFtpServer.Ftp
         private static string ComputerName = "";
         private static string m_ftpIpAddr = "";
 
+        // consecutive identically-shaped log entries (same user/command/result, e.g. a partner
+        // repeatedly issuing MDTM on files that don't exist) are collapsed into a single
+        // "repeated N times" line instead of one line per request - see LogWrite(FtpCommandHandler,...)
+        private static readonly Dictionary<string, PendingLogRun> m_pendingLogRuns = new Dictionary<string, PendingLogRun>();
+
         #endregion
 
         #region Events
@@ -86,6 +91,10 @@ namespace AzureFtpServer.Ftp
             InitialiseMaxClients();
 
             InitialiseLogging();
+
+            // make sure a run that's still being counted (e.g. an ongoing MDTM flood) isn't
+            // silently lost when the process shuts down before it goes idle or hits the threshold
+            AppDomain.CurrentDomain.ProcessExit += (s, e) => FlushPendingLogRuns();
 
             m_theThread = new Thread(ThreadRun);
             m_theThread.Start();
@@ -410,26 +419,239 @@ namespace AzureFtpServer.Ftp
 
             try
             {
-                DateTime utcNow = CurrentTime;
-                string filename = Path.Combine(FtpServer.m_logPath, FileName);
-                // 2015-11-20 23:13:57 213.67.145.199 CLJUNGFTP01\hhh 10.76.190.155 21 RETR 151118+HH-RIG+3-0.avi 226 0 0 5937c9cb-07d9-4fa8-a04d-3bff7fd024e9 /herr/elitserien/1-grundserien/151118+HH-RIG+3-0.avi
+                string endpoint = ch.ConnectionObject.Socket.Client.RemoteEndPoint.ToString();
+                string user = ch.ConnectionObject.User;
+                string command = ch.Command;
+                DateTime now = CurrentTime;
 
-                string logdata = string.Format("{0} {1} {2} {3} {4} {5} {6} {7}\r\n"
-                                            , utcNow.ToString("yyyy-MM-dd HH:mm:ss")
-                                            , ch.ConnectionObject.Socket.Client.RemoteEndPoint.ToString()
-                                            , ch.ConnectionObject.User
-                                            , FtpServer.m_ftpIpAddr
-                                            , ch.Command
-                                            , retCode
-                                            , elapsedMs
-                                            , sMessage
-                                            );
-                lock (LogFileLock)
+                // only "received" pre-log lines (-1) and error responses (4xx/5xx) are ever grouped;
+                // successful/informational responses are always written individually so a real
+                // transfer never gets folded away into a "repeated N times" summary
+                bool groupable = retCode == -1 || retCode >= 400;
+
+                if (groupable && GroupRepeatedLogEntriesEnabled)
                 {
-                    File.AppendAllText(filename, logdata);
+                    GroupedLogWrite(user, command, retCode, elapsedMs, sMessage, endpoint, now);
+                }
+                else
+                {
+                    WriteLogLine(now, endpoint, user, command, retCode, elapsedMs, sMessage);
                 }
             }
-            catch 
+            catch
+            {
+                // can't fail
+            }
+        }
+
+        /// <summary>
+        /// Writes one line to today's log file, e.g.:
+        /// 2015-11-20 23:13:57 213.67.145.199 CLJUNGFTP01\hhh 10.76.190.155 21 RETR 151118+HH-RIG+3-0.avi 226 0 0 5937c9cb-07d9-4fa8-a04d-3bff7fd024e9 /herr/elitserien/1-grundserien/151118+HH-RIG+3-0.avi
+        /// </summary>
+        private static void WriteLogLine(DateTime time, string endpoint, string user, string command, int retCode, long elapsedMs, string sMessage)
+        {
+            string filename = Path.Combine(FtpServer.m_logPath, FileName);
+
+            string logdata = string.Format("{0} {1} {2} {3} {4} {5} {6} {7}\r\n"
+                                        , time.ToString("yyyy-MM-dd HH:mm:ss")
+                                        , endpoint
+                                        , user
+                                        , FtpServer.m_ftpIpAddr
+                                        , command
+                                        , retCode
+                                        , elapsedMs
+                                        , sMessage
+                                        );
+            lock (LogFileLock)
+            {
+                File.AppendAllText(filename, logdata);
+            }
+        }
+
+        /// <summary>
+        /// Tracks one run of consecutive, identically-shaped log entries (same user/command/result)
+        /// that are being collapsed into a single summary line - see GroupedLogWrite.
+        /// </summary>
+        private class PendingLogRun
+        {
+            public string User;
+            public string Command;
+            public int RetCode;
+            public int SuppressedCount;
+            public DateTime FirstTime;
+            public DateTime LastTime;
+            public string LastEndpoint;
+            public string FirstMessage;
+            public string LastMessage;
+            public long LastElapsedMs;
+        }
+
+        // opt-in: off by default so existing deployments keep today's exact log output unless
+        // this is explicitly turned on in App.config
+        private static bool GroupRepeatedLogEntriesEnabled
+        {
+            get
+            {
+                string setting = ConfigurationManager.AppSettings["ftp.log.group-repeated-entries"];
+                return bool.TryParse(setting, out bool val) && val;
+            }
+        }
+
+        // for a sustained flood, checkpoint a summary line every N occurrences instead of only
+        // once the flood finally stops - default matches what's typically enough to make a
+        // repeating partner request obvious without needing to see every single occurrence
+        private static int GroupRepeatedLogEntriesThreshold
+        {
+            get
+            {
+                string setting = ConfigurationManager.AppSettings["ftp.log.group-repeated-entries.threshold"];
+                return int.TryParse(setting, out int val) && val > 0 ? val : 100;
+            }
+        }
+
+        // how long a shape can go without repeating before its run is considered over and its
+        // (if any) summary line is written
+        private static int GroupRepeatedLogEntriesIdleSeconds
+        {
+            get
+            {
+                string setting = ConfigurationManager.AppSettings["ftp.log.group-repeated-entries.idle-seconds"];
+                return int.TryParse(setting, out int val) && val > 0 ? val : 5;
+            }
+        }
+
+        /// <summary>
+        /// Groups consecutive log entries that share the same user/command/result (only "received"
+        /// pre-log lines and 4xx/5xx error responses ever reach here - see LogWrite). The first
+        /// occurrence of a given shape is written immediately, exactly as when grouping is off;
+        /// further repeats are just counted until the shape either stops repeating (idle for
+        /// GroupRepeatedLogEntriesIdleSeconds) or reaches GroupRepeatedLogEntriesThreshold
+        /// occurrences, at which point one summary line is written in place of the individual
+        /// entries it stands for. A shape that never repeats costs nothing extra: it's written
+        /// once, same as always, and its tracking entry is dropped silently once it goes idle.
+        /// </summary>
+        private static void GroupedLogWrite(string user, string command, int retCode, long elapsedMs, string sMessage, string endpoint, DateTime now)
+        {
+            string key = user + "::" + command + "::" + retCode;
+            int threshold = GroupRepeatedLogEntriesThreshold;
+
+            lock (LogFileLock)
+            {
+                SweepStaleRunsLocked(now);
+
+                if (m_pendingLogRuns.TryGetValue(key, out PendingLogRun run))
+                {
+                    run.SuppressedCount++;
+                    run.LastTime = now;
+                    run.LastEndpoint = endpoint;
+                    run.LastMessage = sMessage;
+                    run.LastElapsedMs = elapsedMs;
+
+                    if (run.SuppressedCount >= threshold)
+                    {
+                        FlushRunLocked(run);
+                    }
+                }
+                else
+                {
+                    // first occurrence of this shape: log it immediately, same as when grouping is
+                    // off, then start tracking it in case it turns out to be another flood
+                    WriteLogLine(now, endpoint, user, command, retCode, elapsedMs, sMessage);
+                    m_pendingLogRuns[key] = new PendingLogRun
+                    {
+                        User = user,
+                        Command = command,
+                        RetCode = retCode,
+                        SuppressedCount = 0,
+                        FirstTime = now,
+                        LastTime = now,
+                        LastEndpoint = endpoint,
+                        FirstMessage = sMessage,
+                        LastMessage = sMessage,
+                        LastElapsedMs = elapsedMs
+                    };
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes the "repeated N times" summary for a run, if it actually repeated, and resets its
+        /// counters so a sustained flood gets checkpointed every GroupRepeatedLogEntriesThreshold
+        /// occurrences rather than only once it finally goes idle. Caller holds LogFileLock.
+        /// </summary>
+        private static void FlushRunLocked(PendingLogRun run)
+        {
+            if (run.SuppressedCount <= 0)
+                return; // never repeated - the original line already covers it, nothing to add
+
+            // the suppressed occurrences share the same user/command/result, but the message text
+            // itself (e.g. the file path) commonly differs between them - say so explicitly rather
+            // than implying "N times the exact same request" when it was really N different ones
+            string variesNote = run.FirstMessage == run.LastMessage
+                ? "same request"
+                : "details vary, e.g. different files";
+
+            string summary = $"{run.LastMessage} (+{run.SuppressedCount} more, {variesNote}, " +
+                              $"{run.FirstTime:HH:mm:ss}-{run.LastTime:HH:mm:ss})";
+
+            WriteLogLine(run.LastTime, run.LastEndpoint, run.User, run.Command, run.RetCode, run.LastElapsedMs, summary);
+
+            run.SuppressedCount = 0;
+            run.FirstTime = run.LastTime;
+            run.FirstMessage = run.LastMessage;
+        }
+
+        /// <summary>
+        /// Flushes (and forgets) any tracked run that hasn't repeated in GroupRepeatedLogEntriesIdleSeconds,
+        /// so a burst that stops gets its summary line written soon after rather than staying invisible
+        /// until something else happens to touch the same (user, command, result) combination.
+        /// Caller holds LogFileLock.
+        /// </summary>
+        private static void SweepStaleRunsLocked(DateTime now)
+        {
+            if (m_pendingLogRuns.Count == 0)
+                return;
+
+            double idleSeconds = GroupRepeatedLogEntriesIdleSeconds;
+            List<string> staleKeys = null;
+
+            foreach (var kvp in m_pendingLogRuns)
+            {
+                if ((now - kvp.Value.LastTime).TotalSeconds < idleSeconds)
+                    continue;
+
+                FlushRunLocked(kvp.Value);
+                (staleKeys ?? (staleKeys = new List<string>())).Add(kvp.Key);
+            }
+
+            if (staleKeys != null)
+            {
+                foreach (string key in staleKeys)
+                    m_pendingLogRuns.Remove(key);
+            }
+        }
+
+        /// <summary>
+        /// Flushes every run still being counted. Called on process shutdown so a flood that's
+        /// still ongoing (or hasn't gone idle yet) doesn't lose its final tally.
+        /// </summary>
+        public static void FlushPendingLogRuns()
+        {
+            if (!m_logEnabled)
+                return;
+
+            try
+            {
+                lock (LogFileLock)
+                {
+                    foreach (var run in m_pendingLogRuns.Values)
+                    {
+                        FlushRunLocked(run);
+                    }
+                    m_pendingLogRuns.Clear();
+                }
+            }
+            catch
             {
                 // can't fail
             }
