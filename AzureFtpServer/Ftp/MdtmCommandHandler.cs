@@ -14,6 +14,9 @@ namespace AzureFtpServer.FtpCommands
         {
         }
 
+        // some clients send MDTM for every listed entry, directories included (reply 550 with the path)
+        protected override bool OmitRedundantReceivedLog => true;
+
         protected override FtpResponse OnProcess(string sMessage)
         {
             string sPath = GetPath(sMessage.Trim());
