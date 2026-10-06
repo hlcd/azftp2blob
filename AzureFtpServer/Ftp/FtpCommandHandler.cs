@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using AzureFtpServer.Ftp;
 using AzureFtpServer.General;
 
@@ -13,6 +16,11 @@ namespace AzureFtpServer.FtpCommands
 
         private readonly string m_sCommand;
         private readonly FtpConnectionObject m_theConnectionObject;
+
+        // reply code -> count, for commands which are logged as a summary (see FtpServer.LogWrite);
+        // handlers are created per connection, so these are numbers for a single connection
+        private readonly SortedDictionary<int, int> m_summarizedReplies = new SortedDictionary<int, int>();
+        private DateTime m_summaryStart;
 
         #endregion
 
@@ -73,6 +81,33 @@ namespace AzureFtpServer.FtpCommands
         {
             Debug.Assert(false, "FtpCommandHandler::OnProcess base called");
             return null;
+        }
+
+        internal void CountSummarizedReply(int retCode)
+        {
+            if (m_summarizedReplies.Count == 0)
+            {
+                m_summaryStart = FtpServer.CurrentTime;
+            }
+
+            m_summarizedReplies.TryGetValue(retCode, out int count);
+            m_summarizedReplies[retCode] = count + 1;
+        }
+
+        /// <summary>
+        /// e.g. "MDTM summary: 734 commands since 07:41:39, replies: 213 x4, 550 x730"
+        /// </summary>
+        /// <returns>null if nothing was counted</returns>
+        internal string GetLogSummary()
+        {
+            if (m_summarizedReplies.Count == 0)
+            {
+                return null;
+            }
+
+            string replies = string.Join(", ", m_summarizedReplies.Select(r => $"{r.Key} x{r.Value}"));
+            return $"{Command} summary: {m_summarizedReplies.Values.Sum()} commands since {m_summaryStart:HH:mm:ss}, " +
+                   $"replies: {replies}";
         }
 
 //        protected string GetMessage(int nReturnCode, string sMessage)

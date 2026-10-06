@@ -162,6 +162,8 @@ namespace AzureFtpServer.Ftp
             }
             finally
             {
+                // before closing the socket, remote end point is not available afterwards
+                m_theCommands.LogSummaries();
                 FtpServerMessageHandler.SendMessage(m_nId, "Connection closed");
                 m_theSocket.CloseSafelly();
                 lock (lastActiveLock)
