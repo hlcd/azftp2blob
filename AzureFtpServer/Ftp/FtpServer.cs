@@ -39,7 +39,6 @@ namespace AzureFtpServer.Ftp
         private static string m_logPath = "";
         private static string ComputerName = "";
         private static string m_ftpIpAddr = "";
-        private static HashSet<string> m_logSummarizedCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         #endregion
 
@@ -243,14 +242,7 @@ namespace AzureFtpServer.Ftp
             if (!FtpServer.m_logEnabled)
                 return;
             FtpServer.m_logPath = ConfigurationManager.AppSettings["LogPath"];
-            FtpServer.ComputerName = Environment.MachineName;
-
-            // commands logged as one summary line per connection instead of line per command;
-            // MDTM by default, empty value logs every command separately
-            string summarizedCommands = ConfigurationManager.AppSettings["ftp.log.summarized-commands"] ?? "MDTM";
-            FtpServer.m_logSummarizedCommands = new HashSet<string>(
-                summarizedCommands.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries),
-                StringComparer.OrdinalIgnoreCase);
+            FtpServer.ComputerName = Environment.MachineName;       
 
             try
             {
@@ -415,16 +407,6 @@ namespace AzureFtpServer.Ftp
         {
             if (!m_logEnabled)
                 return;
-
-            if (m_logSummarizedCommands.Contains(ch.Command))
-            {
-                // replies are only counted, summary is logged when connection is closed
-                if (retCode != -1)
-                {
-                    ch.CountSummarizedReply(retCode);
-                }
-                return;
-            }
 
             try
             {

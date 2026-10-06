@@ -196,21 +196,6 @@ namespace AzureFtpServer.Ftp
             m_useDataSocket = false;
         }
 
-        /// <summary>
-        /// Logs summaries of commands which are not logged one by one, see FtpServer.LogWrite
-        /// </summary>
-        public void LogSummaries()
-        {
-            foreach (FtpCommandHandler handler in m_theCommandHashTable.Values)
-            {
-                string summary = handler.GetLogSummary();
-                if (summary != null)
-                {
-                    FtpServer.LogWrite(this, summary);
-                }
-            }
-        }
-
         public void LogOut()
         {
             isLogged = false;
