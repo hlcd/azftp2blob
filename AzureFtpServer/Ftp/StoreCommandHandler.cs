@@ -1,6 +1,5 @@
 using System.Text;
 using System.Diagnostics;
-using System.Configuration;
 using System.Security.Cryptography;
 using AzureFtpServer.Ftp;
 using AzureFtpServer.Ftp.FileSystem;

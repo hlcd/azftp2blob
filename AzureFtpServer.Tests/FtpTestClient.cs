@@ -1,8 +1,8 @@
 using System;
-using System.Configuration;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
+using AzureFtpServer.General;
 
 namespace AzureFtpServer.Tests
 {
@@ -45,7 +45,7 @@ namespace AzureFtpServer.Tests
 
         private static TcpClient Connect()
         {
-            int port = int.Parse(ConfigurationManager.AppSettings["FTP"]);
+            int port = int.Parse(AppSettings.Get("FTP"));
 
             // server starts listening on its own thread, give it a moment
             for (int attempt = 1; ; attempt++)

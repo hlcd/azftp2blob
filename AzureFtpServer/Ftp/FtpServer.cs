@@ -6,7 +6,6 @@ using System.Text;
 using System.IO;
 using System.Threading;
 using System.Diagnostics;
-using System.Configuration;
 using System.Net;
 using System.Linq;
 using AzureFtpServer.Extensions;
@@ -114,7 +113,7 @@ namespace AzureFtpServer.Ftp
             FtpServerMessageHandler.Message += TraceMessage;
 
             // listen at the port by the "FTP" endpoint setting
-            int port = int.Parse(ConfigurationManager.AppSettings["FTP"]);
+            int port = int.Parse(AppSettings.Get("FTP"));
             System.Net.IPAddress ipaddr = SocketHelpers.GetLocalAddress();
             //System.Net.IPEndPoint ipEndPoint = new System.Net.IPEndPoint(ipaddr.Address, port);
             System.Net.IPEndPoint ipEndPoint = new System.Net.IPEndPoint(IPAddress.Any, port);
@@ -192,7 +191,7 @@ namespace AzureFtpServer.Ftp
         /// </summary>
         private void InitialiseConnectionEncoding()
         {
-            string encoding = ConfigurationManager.AppSettings["ConnectionEncoding"];
+            string encoding = AppSettings.Get("ConnectionEncoding");
             switch (encoding)
             {
                 case "ASCII":
@@ -213,7 +212,7 @@ namespace AzureFtpServer.Ftp
         /// </summary>
         private void InitialiseMaxClients()
         {
-            string maxClients = ConfigurationManager.AppSettings["MaxClients"];
+            string maxClients = AppSettings.Get("MaxClients");
 
             int iMaxClients = 5;
             
@@ -237,11 +236,11 @@ namespace AzureFtpServer.Ftp
         }
         private void InitialiseLogging()
         {
-            string buf = ConfigurationManager.AppSettings["LoggingEnabled"];
+            string buf = AppSettings.Get("LoggingEnabled");
             FtpServer.m_logEnabled = buf.ToLowerInvariant() == "true";
             if (!FtpServer.m_logEnabled)
                 return;
-            FtpServer.m_logPath = ConfigurationManager.AppSettings["LogPath"];
+            FtpServer.m_logPath = AppSettings.Get("LogPath");
             FtpServer.ComputerName = Environment.MachineName;       
 
             try
@@ -370,7 +369,7 @@ namespace AzureFtpServer.Ftp
         {
             get
             {
-                string setting = ConfigurationManager.AppSettings["ftp.log.server-time"];
+                string setting = AppSettings.Get("ftp.log.server-time");
                 //store time in utc by default, unless specified otherwise in config
                 return !bool.TryParse(setting, out bool val) || !val;
             }

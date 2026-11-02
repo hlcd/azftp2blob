@@ -1,7 +1,7 @@
 using System;
-using System.Configuration;
 using System.IO;
 using System.Linq;
+using AzureFtpServer.General;
 using AzureFtpServer.Ftp;
 using FluentAssertions;
 using NUnit.Framework;
@@ -15,7 +15,7 @@ namespace AzureFtpServer.Tests
     /// </summary>
     public class MdtmLoggingTests
     {
-        private static readonly string LogDir = ConfigurationManager.AppSettings["LogPath"];
+        private static readonly string LogDir = AppSettings.Get("LogPath");
 
         private FtpServer _server;
 
