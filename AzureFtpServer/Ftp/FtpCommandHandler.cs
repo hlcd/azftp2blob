@@ -34,26 +34,29 @@ namespace AzureFtpServer.FtpCommands
 
         public virtual bool CanLogCommandArg => true;
 
+        /// <summary>
+        /// When true, "received" line is logged after the command is processed and only if the reply
+        /// doesn't contain the command argument (otherwise the reply line alone identifies the request).
+        /// Meant for commands sent in large numbers, e.g. MDTM for every listed entry.
+        /// </summary>
+        protected virtual bool OmitRedundantReceivedLog => false;
+
         #endregion
 
         #region Methods
 
         public void Process(string sMessage)
         {
-            if (CanLogCommandArg)
+            if (!OmitRedundantReceivedLog)
             {
-                FtpServer.LogWrite(this, $"received: {sMessage}", -1, 0);
-            }
-            else
-            {
-                FtpServer.LogWrite(this, "received", -1, 0);
+                LogReceived(sMessage);
             }
             var sw = new Stopwatch();
             sw.Start();
 
             try
             {
-                FtpResponse reply = OnProcess(sMessage);
+                FtpResponse reply = OmitRedundantReceivedLog ? ProcessLoggingReceivedIfNeeded(sMessage) : OnProcess(sMessage);
                 sw.Stop();
                 FtpServer.LogWrite(this, reply.Message, reply.Code, sw.ElapsedMilliseconds);
 
@@ -66,6 +69,38 @@ namespace AzureFtpServer.FtpCommands
                 //send message to client, then rethrow
                 SendMessage(commandEx.MessageToClient);
                 throw;
+            }
+        }
+
+        private FtpResponse ProcessLoggingReceivedIfNeeded(string sMessage)
+        {
+            FtpResponse reply = null;
+            try
+            {
+                reply = OnProcess(sMessage);
+                return reply;
+            }
+            finally
+            {
+                // also logged when processing failed, before the reply/error line
+                string arg = sMessage.Trim();
+                bool redundant = reply?.Message != null && arg.Length > 0 && reply.Message.Contains(arg);
+                if (!redundant)
+                {
+                    LogReceived(sMessage);
+                }
+            }
+        }
+
+        private void LogReceived(string sMessage)
+        {
+            if (CanLogCommandArg)
+            {
+                FtpServer.LogWrite(this, $"received: {sMessage}", -1, 0);
+            }
+            else
+            {
+                FtpServer.LogWrite(this, "received", -1, 0);
             }
         }
 

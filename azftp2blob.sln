@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "azftp2blob", "azftp2blob\az
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureFtpServer", "AzureFtpServer\AzureFtpServer.csproj", "{A6520CEB-6E55-4C9D-B581-64E432DB16D0}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzureFtpServer.Tests", "AzureFtpServer.Tests\AzureFtpServer.Tests.csproj", "{9F894F07-7FEC-4F90-8818-D4EA146BD3EE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{A6520CEB-6E55-4C9D-B581-64E432DB16D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6520CEB-6E55-4C9D-B581-64E432DB16D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6520CEB-6E55-4C9D-B581-64E432DB16D0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F894F07-7FEC-4F90-8818-D4EA146BD3EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F894F07-7FEC-4F90-8818-D4EA146BD3EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F894F07-7FEC-4F90-8818-D4EA146BD3EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F894F07-7FEC-4F90-8818-D4EA146BD3EE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

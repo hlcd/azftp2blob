@@ -1,8 +1,8 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using Microsoft.WindowsAzure.Storage.Core;
-using Microsoft.WindowsAzure.Storage.Blob;
+using Azure.Storage.Blobs.Models;
 using AzureFtpServer.Ftp.FileSystem;
 using AzureFtpServer.Provider;
 
@@ -62,7 +62,7 @@ namespace AzureFtpServer.Azure
         /// <returns>an arry of filenames</returns>
         public IFileInfo[] GetFiles(string sDirPath)
         {
-            IEnumerable<CloudBlockBlob> files = _provider.GetFileListing(sDirPath);
+            IEnumerable<BlobItem> files = _provider.GetFileListing(sDirPath);
             return files.Select(r => new AzureFileInfo(r)).ToArray();
 
         }
@@ -75,8 +75,11 @@ namespace AzureFtpServer.Azure
         /// <returns>an array of directorynames</returns>
         public IFileInfo[] GetDirectories(string sDirPath, bool actualCreationTime)
         {
-            IEnumerable<CloudBlobDirectory> directories = _provider.GetDirectoryListing(sDirPath);
-            return directories.Select(r => new AzureFileInfo(r, actualCreationTime)).ToArray();
+            IEnumerable<string> directories = _provider.GetDirectoryListing(sDirPath);
+            return directories
+                .Select(r => new AzureFileInfo("/" + r,
+                    actualCreationTime ? _provider.GetDirectoryCreationTime(r) : DateTime.UtcNow))
+                .ToArray();
         }
 
         /// <summary>

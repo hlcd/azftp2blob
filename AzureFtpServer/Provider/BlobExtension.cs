@@ -1,25 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace AzureFtpServer.Provider
 {
+    /// <summary>
+    /// Creation time of a directory, stored in metadata of its placeholder blob
+    /// </summary>
     internal static class BlobExtension
     {
         private const string CreationTimeKey = "CreationTime";
         private const string DateFormatIso8601 = "O";
-        public static void SetCreationTime(this CloudBlob blob)
+        public static void SetCreationTime(this IDictionary<string, string> metadata)
         {
-            blob.Metadata[CreationTimeKey] = DateTimeOffset.UtcNow.ToString(DateFormatIso8601);
+            metadata[CreationTimeKey] = DateTimeOffset.UtcNow.ToString(DateFormatIso8601);
         }
 
-        public static DateTimeOffset? GetCreationTime(this CloudBlob blob)
+        public static DateTimeOffset? GetCreationTime(this IDictionary<string, string> metadata)
         {
-            if (blob.Metadata.TryGetValue(CreationTimeKey, out string dateInMeta))
+            if (metadata.TryGetValue(CreationTimeKey, out string dateInMeta))
             {
                 return DateTimeOffset.ParseExact(dateInMeta, DateFormatIso8601, CultureInfo.InvariantCulture);
             }

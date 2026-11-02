@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AzureFtpServer.General;
 using AzureFtpServer.Azure;
 using AzureFtpServer.Ftp;
 using AzureFtpServer.Provider;
@@ -47,8 +47,8 @@ namespace azftp2blob
         }
         private string GetArgument(string[] args, string key, string defaultValue)
         {
-            // get key/value from A) App.Config, B) env var, C) command line
-            string value = ConfigurationManager.AppSettings[key];
+            // get key/value from A) appsettings.json, B) env var, C) command line
+            string value = AppSettings.Get(key);
             string buf = Environment.GetEnvironmentVariable(key);
             if (!string.IsNullOrWhiteSpace(buf))
                 value = buf;

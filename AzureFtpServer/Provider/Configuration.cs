@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Configuration;
 using System.Runtime.CompilerServices;
-using Microsoft.WindowsAzure.Storage;
+using AzureFtpServer.General;
 
 namespace AzureFtpServer.Provider
 {
@@ -18,7 +17,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                return ConfigurationManager.AppSettings["FtpAccount"];
+                return AppSettings.Get("FtpAccount");
             }
         }
 
@@ -26,7 +25,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                return (Modes)Enum.Parse(typeof(Provider.Modes), ConfigurationManager.AppSettings["Mode"]);
+                return (Modes)Enum.Parse(typeof(Provider.Modes), AppSettings.Get("Mode"));
             }
         }
 
@@ -34,7 +33,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                return bool.Parse(ConfigurationManager.AppSettings["QueueNotification"]);
+                return bool.Parse(AppSettings.Get("QueueNotification"));
             }
         }
 
@@ -42,7 +41,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                return int.Parse(ConfigurationManager.AppSettings["MaxIdleSeconds"]);
+                return int.Parse(AppSettings.Get("MaxIdleSeconds"));
             }
         }
 
@@ -50,7 +49,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                string buf = ConfigurationManager.AppSettings["FtpServerHost"];
+                string buf = AppSettings.Get("FtpServerHost");
                 buf = Environment.ExpandEnvironmentVariables(buf);
                 return buf;
             }
@@ -59,7 +58,7 @@ namespace AzureFtpServer.Provider
         {
             get
             {
-                string buf = ConfigurationManager.AppSettings["FtpServerHostPublic"];
+                string buf = AppSettings.Get("FtpServerHostPublic");
                 buf = Environment.ExpandEnvironmentVariables(buf);
                 return buf;
             }
@@ -72,7 +71,7 @@ namespace AzureFtpServer.Provider
 
         private static bool CheckFlag([CallerMemberName] string key = null)
         {
-            string buf = ConfigurationManager.AppSettings[key];
+            string buf = AppSettings.Get(key);
             return !string.IsNullOrEmpty(buf) && buf.ToLowerInvariant() == "true";
         }
         

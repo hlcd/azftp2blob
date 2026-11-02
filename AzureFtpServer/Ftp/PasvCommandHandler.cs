@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Configuration;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -25,9 +24,9 @@ namespace AzureFtpServer.FtpCommands
             : base("PASV", connectionObject)
         {
             // set passive listen port
-            m_nPort = int.Parse(ConfigurationManager.AppSettings["FTPPASV"]);
+            m_nPort = int.Parse(AppSettings.Get("FTPPASV"));
             int maxWaitSeconds;
-            if (!int.TryParse(ConfigurationManager.AppSettings["MaxIdleSeconds"], out maxWaitSeconds))
+            if (!int.TryParse(AppSettings.Get("MaxIdleSeconds"), out maxWaitSeconds))
             {
                 maxAcceptWaitTimeSeconds = 60;
             }
@@ -51,8 +50,8 @@ namespace AzureFtpServer.FtpCommands
             //return GetMessage(227, string.Format("Entering Passive Mode ({0})", pasvListenAddress));
 
             // listen at the port by the "FTP" endpoint setting
-            int port = int.Parse(ConfigurationManager.AppSettings["FTPPASV"]);
-            int maxPort = port + int.Parse(ConfigurationManager.AppSettings["MaxClients"]);
+            int port = int.Parse(AppSettings.Get("FTPPASV"));
+            int maxPort = port + int.Parse(AppSettings.Get("MaxClients"));
 
             int selectedPort = port;
             lock (ListeningPassivePorts)

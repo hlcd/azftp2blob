@@ -1,6 +1,5 @@
 using System.Text;
 using System.Diagnostics;
-using System.Configuration;
 using AzureFtpServer.Ftp;
 using AzureFtpServer.Provider;
 

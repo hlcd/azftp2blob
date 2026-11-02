@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Runtime.Remoting.Messaging;
 using System.Text;
+using Azure.Storage.Blobs.Models;
 using AzureFtpServer.Ftp.FileSystem;
 using AzureFtpServer.Provider;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace AzureFtpServer.Azure
 {
@@ -22,7 +20,7 @@ namespace AzureFtpServer.Azure
             }
         }
 
-        public AzureFileInfo(CloudBlockBlob blob)
+        public AzureFileInfo(BlobItem blob)
         {
             exists = blob != null;
             if (exists)
@@ -30,43 +28,20 @@ namespace AzureFtpServer.Azure
                 path = blob.Name;
                 isDirectory = false;
                 lastModified = blob.Properties.LastModified?.UtcDateTime ?? DateTime.UtcNow;
-                size = blob.Properties.Length;
+                size = blob.Properties.ContentLength ?? 0;
             }
         }
 
-        private DateTimeOffset GetActualCreationTime(CloudBlobDirectory blob)
+        /// <param name="directoryPath">ftp path of a directory, e.g. "/dir/sub/"</param>
+        /// <param name="lastModified">creation time of the directory or current time</param>
+        public AzureFileInfo(string directoryPath, DateTime lastModified)
         {
-            CloudBlob actualBlob = blob.Container.GetBlobReference(blob.Prefix);
-            if (actualBlob == null)
-            {
-                return DateTimeOffset.UtcNow;
-            }
-
-            try
-            {
-                actualBlob.FetchAttributes();
-                return actualBlob.GetCreationTime() ?? DateTimeOffset.UtcNow;
-            }
-            catch (StorageException)
-            {
-                return DateTimeOffset.UtcNow;
-            }
-        }
-
-        public AzureFileInfo(CloudBlobDirectory blob, bool readActualCreationTime)
-        {
-            exists = blob != null;
+            exists = directoryPath != null;
             if (exists)
             {
-                path = blob.Uri.ToString().Replace(blob.Container.Uri.ToString(), string.Empty);
+                path = directoryPath;
                 isDirectory = true;
-                lastModified = DateTime.UtcNow;
-
-                if (readActualCreationTime)
-                {
-                    lastModified = GetActualCreationTime(blob).UtcDateTime;
-                }
-
+                this.lastModified = lastModified;
                 size = 1;
             }
         }
